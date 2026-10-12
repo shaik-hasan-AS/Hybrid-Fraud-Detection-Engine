@@ -1,8 +1,10 @@
+import json
+import os
+import joblib
+import numpy as np
 import pandas as pd
 import psycopg2
 from sklearn.ensemble import IsolationForest
-import joblib
-import os
 
 DB_CONFIG = {
     "dbname": os.environ.get("DB_NAME", "fraud_db"),
@@ -21,7 +23,6 @@ def main():
     print("Connecting to DB and loading features...")
     conn = get_db_connection()
 
-    # Query features from the view
     query = """
     SELECT 
         transaction_id,
@@ -44,7 +45,6 @@ def main():
 
     print(f"Loaded {len(df)} transactions.")
 
-    # Features to train on
     feature_cols = [
         "amount",
         "velocity_count",
@@ -57,25 +57,48 @@ def main():
         "rule_late_night",
     ]
 
-    X = df[feature_cols]
-
-    # Fill any remaining NaNs
-    X = X.fillna(0)
+    X = df[feature_cols].fillna(0)
 
     print("Training Isolation Forest model...")
-    # Using 'auto' contamination allows the model to decide the threshold based on score distribution
-    model = IsolationForest(n_estimators=100, contamination="auto", random_state=42)
+    # 150 estimators for tree diversity
+    model = IsolationForest(
+        n_estimators=150,
+        contamination=0.05,
+        max_samples="auto",
+        random_state=42,
+    )
     model.fit(X)
 
-    # Calculate anomaly scores (-1 for outliers, 1 for inliers)
-    # The decision_function gives continuous scores where lower is more abnormal
-    df["ml_anomaly_score"] = model.decision_function(X)
+    # Compute raw decision function scores
+    raw_scores = model.decision_function(X)
 
-    print("Saving model to disk...")
+    # Calculate calibrated percentile thresholds for smooth scaling
+    min_score = float(np.percentile(raw_scores, 1))   # 1st percentile (extreme anomalies)
+    median_score = float(np.median(raw_scores))       # Median of benign transactions
+    max_score = float(np.percentile(raw_scores, 99))  # 99th percentile
+
+    # Feature statistics for baseline SHAP-like attribution
+    feature_medians = {col: float(X[col].median()) for col in feature_cols}
+    feature_stds = {col: float(X[col].std() if X[col].std() > 0 else 1.0) for col in feature_cols}
+
+    meta = {
+        "feature_cols": feature_cols,
+        "calibration": {
+            "min_score": min_score,
+            "median_score": median_score,
+            "max_score": max_score,
+        },
+        "feature_medians": feature_medians,
+        "feature_stds": feature_stds,
+    }
+
+    print("Saving calibrated model and metadata...")
     os.makedirs("ml/models", exist_ok=True)
     joblib.dump(model, "ml/models/isolation_forest.joblib")
+    with open("ml/models/model_meta.json", "w") as f:
+        json.dump(meta, f, indent=2)
 
-    print("Model trained and saved successfully.")
+    print("Model and calibration metadata saved successfully.")
 
 
 if __name__ == "__main__":

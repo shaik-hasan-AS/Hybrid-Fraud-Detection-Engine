@@ -56,7 +56,21 @@ CREATE TABLE transactions (
 
 -- Indexes for performance
 CREATE INDEX idx_transactions_account_id ON transactions(account_id, timestamp);
+CREATE INDEX idx_transactions_account_device_ts ON transactions(account_id, device_id, timestamp);
 CREATE INDEX idx_transactions_card_id ON transactions(card_id, timestamp);
 CREATE INDEX idx_transactions_merchant_id ON transactions(merchant_id);
 CREATE INDEX idx_transactions_device_id ON transactions(device_id);
 CREATE INDEX idx_transactions_timestamp ON transactions(timestamp);
+
+-- Analyst Case Management & Resolution Audit Log
+CREATE TABLE fraud_actions (
+    action_id VARCHAR(50) PRIMARY KEY,
+    transaction_id VARCHAR(50) REFERENCES transactions(transaction_id),
+    action VARCHAR(50) NOT NULL,
+    analyst_notes TEXT,
+    resolved_by VARCHAR(50) DEFAULT 'analyst_1',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_fraud_actions_tx ON fraud_actions(transaction_id);
+CREATE INDEX idx_fraud_actions_created ON fraud_actions(created_at);
