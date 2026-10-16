@@ -23,9 +23,12 @@ A high-throughput, full-stack **Transaction Anomaly Detection & Fraud Investigat
 - [Analyst Case Management & Audit Trail](#-analyst-case-management--audit-trail)
 - [API & WebSocket Reference](#-api--websocket-reference)
 - [Database Schema & Relational Design](#-database-schema--relational-design)
+- [Prerequisites & System Requirements](#-prerequisites--system-requirements)
 - [Quick Start (Docker Compose)](#-quick-start-docker-compose)
 - [Manual Local Development Setup](#-manual-local-development-setup)
+- [Verifying & Testing the Pipeline](#-verifying--testing-the-pipeline)
 - [Environment Variables](#-environment-variables)
+- [Troubleshooting & FAQ](#-troubleshooting--faq)
 - [Repository Structure](#-repository-structure)
 
 ---
@@ -302,11 +305,25 @@ erDiagram
 
 ---
 
-## 🚀 Quick Start (Docker Compose)
+## 📋 Prerequisites & System Requirements
+
+Before beginning, ensure you have one of the following setups:
+
+| Setup Method | Required Software | Recommended For |
+|---|---|---|
+| **Option A: Docker Compose** | Docker 24+ & Docker Compose v2+ | Quickest setup, zero host toolchain installation |
+| **Option B: Local Host** | Python 3.10+, Node.js 18+, npm 9+, Docker (for PostgreSQL) | Active full-stack development & customization |
+
+> [!NOTE]
+> The repository **ships with pre-trained models and calibration metadata** ([`ml/models/isolation_forest.joblib`](ml/models/isolation_forest.joblib) and [`ml/models/model_meta.json`](ml/models/model_meta.json)). You can start inference and streaming immediately upon launch without waiting for model training.
+
+---
+
+## 🚀 Option A: One-Command Quick Start (Docker Compose)
 
 The entire ecosystem (PostgreSQL 15 + DB initialization scripts + FastAPI backend + React frontend) runs in Docker with zero host dependencies.
 
-### 1. Clone the repository
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/shaik-hasan-AS/Hybrid-Fraud-Detection-Engine.git
 cd Hybrid-Fraud-Detection-Engine
@@ -316,15 +333,16 @@ cd Hybrid-Fraud-Detection-Engine
 ```bash
 docker compose up --build -d
 ```
+> This starts PostgreSQL (`localhost:5433`), the FastAPI backend (`localhost:8000`), and the React dashboard (`localhost:5173`).
 
-### 3. Seed Synthetic Data
-Generate customers, merchants, devices, cards, and realistic transactions:
+### 3. Seed Synthetic Data *(Optional / Initial Run)*
+The database initializes with schema and rules. To populate 50,000+ realistic multi-currency transactions across 5 global hubs:
 ```bash
 docker compose exec backend python ../data/generate_data.py
 ```
 
-### 4. Train the ML Isolation Forest
-Train the model on the generated database features and export calibration metadata:
+### 4. Retrain the ML Model *(Optional)*
+To retrain the Isolation Forest on your latest seeded transactions and refresh percentile calibration:
 ```bash
 docker compose exec backend python ../ml/train_isolation_forest.py
 ```
@@ -332,47 +350,83 @@ docker compose exec backend python ../ml/train_isolation_forest.py
 ### 5. Access the Platform
 - **Analyst Dashboard**: [http://localhost:5173/](http://localhost:5173/)
 - **FastAPI Interactive Docs (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Database Port**: `localhost:5433` (mapped from container 5432)
+- **Live WebSocket Feed**: `ws://localhost:8000/ws/live`
+- **PostgreSQL Port**: `localhost:5433` (mapped from container `5432`)
+
+To stop all services:
+```bash
+docker compose down
+```
 
 ---
 
-## 💻 Manual Local Development Setup
+## 💻 Option B: Manual Local Development Setup
 
-If you prefer running services directly on your host machine:
+If you prefer running the backend and frontend directly on your host machine for development:
 
 ### 1. Start PostgreSQL with Extensions
 ```bash
 docker compose up db -d
 ```
-*(PostgreSQL will boot on `localhost:5433` with `fraud_db`, `schema.sql`, and `rules.sql` initialized).*
+*(PostgreSQL boots on `localhost:5433` with database `fraud_db`, `schema.sql`, and `rules.sql` initialized).*
 
-### 2. Set Up Backend & Train Model
+### 2. Set Up Python Virtual Environment & Backend
+Open a terminal in the project root:
 ```bash
-cd backend
-python -m venv venv
+# Create and activate virtual environment
+python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
 
-# Seed synthetic customer and transaction history
-python ../data/generate_data.py
+# Install dependencies
+pip install -r backend/requirements.txt
 
-# Train calibrated Isolation Forest
-python ../ml/train_isolation_forest.py
+# Seed synthetic customer and transaction history (if not already seeded)
+python data/generate_data.py
+
+# Optional: Retrain the calibrated Isolation Forest
+python ml/train_isolation_forest.py
 
 # Launch FastAPI development server
+cd backend
 uvicorn main:app --reload --port 8000
 ```
 
-### 3. Launch the Frontend
-In a new terminal window:
+### 3. Launch Frontend Mission Control Dashboard
+In a **new terminal window**:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
 Open [http://localhost:5173/](http://localhost:5173/) in your browser.
 
 ---
+
+## 🧪 Verifying & Testing the Pipeline
+
+Follow these quick steps to verify that every layer of the engine is operating correctly:
+
+1. **Verify Live Streaming**:
+   - Open [http://localhost:5173/](http://localhost:5173/).
+   - Look at the header status indicator — it should show a pulsing green radar icon: **`SYSTEM LIVE // WEBSOCKET CONNECTED`**.
+   - Watch the **Live Stream Feed** and **Telemetry KPI cards** update in real time as the background simulator generates transactions.
+
+2. **Test Critical Threat Alert & Audio Synthesizer**:
+   - When a transaction with a Hybrid Risk Score $\ge 80$ arrives, a red **Threat Toast** will slide in at the top right, accompanied by an acoustic dual-beep tone (powered by the Web Audio API).
+   - You can toggle sound on/off using the speaker icon in the top header.
+
+3. **Perform an Analyst Case Action**:
+   - Click on any transaction card to open the **Investigation Drawer**.
+   - Review the **SQL Rule Breakdown**, **ML Explainability (SHAP-style Feature Impact)**, and **Historical Timeline**.
+   - Click **Block Card** (or **False Positive** / **Request KYC** / **Resolve Alert**) with optional notes.
+   - Verify that the transaction status updates immediately and broadcasts a `CASE_ACTION_TAKEN` event across all open analyst dashboards.
+
+4. **Verify Database Records**:
+   ```bash
+   docker exec -it fraud_db psql -U fraud_user -d fraud_db -c "SELECT * FROM fraud_actions ORDER BY created_at DESC LIMIT 5;"
+   ```
+
 
 ## ⚙️ Environment Variables
 
@@ -385,10 +439,45 @@ The backend and data scripts automatically recognize the following configuration
 | `DB_PASSWORD` | `fraud_password` | `fraud_password` | Database user password |
 | `DB_HOST` | `localhost` | `db` | Database host address |
 | `DB_PORT` | `5433` | `5432` | Database port (5433 for external host, 5432 inside Docker network) |
+| `VITE_API_URL` | `http://localhost:8000` | `http://localhost:8000` | Backend REST/WebSocket server address for Vite client |
+
+---
+
+## 🛠️ Troubleshooting & FAQ
+
+### 1. Port 5433 Already in Use
+If another service or PostgreSQL instance is using port 5433, change the host port mapping in `docker-compose.yml`:
+```yaml
+ports:
+  - "5434:5432"
+```
+And set `DB_PORT=5434` when running local Python scripts.
+
+### 2. Missing `cube` or `earthdistance` Extension Errors
+The database requires PostgreSQL spatial extensions for the impossible travel rule:
+```bash
+docker exec -it fraud_db psql -U fraud_user -d fraud_db -c "CREATE EXTENSION IF NOT EXISTS cube; CREATE EXTENSION IF NOT EXISTS earthdistance;"
+```
+
+### 3. Frontend WebSocket Connection Refused
+Ensure the backend server is running on `http://localhost:8000`. If running on a remote host or virtual machine, configure `VITE_API_URL` in `frontend/.env`:
+```env
+VITE_API_URL=http://<your-server-ip>:8000
+```
+
+### 4. Re-initializing Database from Scratch
+To completely wipe and rebuild the database with clean volume mounts:
+```bash
+docker compose down -v
+docker compose up db -d
+python data/generate_data.py
+python ml/train_isolation_forest.py
+```
 
 ---
 
 ## 📂 Repository Structure
+
 
 ```
 Hybrid-Fraud-Detection-Engine/

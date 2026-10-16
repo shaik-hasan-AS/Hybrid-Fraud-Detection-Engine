@@ -3,15 +3,16 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir --default-timeout=100 -r /app/backend/requirements.txt
 
-# Copy the rest of the application
-# We assume the docker-compose context will be the root directory
-# so we can copy ml models if needed.
-COPY . /app/backend
-COPY ../ml /app/ml
+
+# Copy application directories
+COPY backend /app/backend
+COPY ml /app/ml
+COPY data /app/data
 
 # The main.py will be executed from within /app/backend
 WORKDIR /app/backend
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+

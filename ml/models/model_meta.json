@@ -1,0 +1,40 @@
+{
+  "feature_cols": [
+    "amount",
+    "velocity_count",
+    "z_score",
+    "travel_speed_kmh",
+    "new_device_flag",
+    "micro_charge_count",
+    "category_change_flag",
+    "rule_foreign_transaction",
+    "rule_late_night"
+  ],
+  "calibration": {
+    "min_score": -0.1324577062904186,
+    "median_score": 0.17478001852221664,
+    "max_score": 0.2243536385437745
+  },
+  "feature_medians": {
+    "amount": 20.54,
+    "velocity_count": 1.0,
+    "z_score": 0.4091782620107417,
+    "travel_speed_kmh": 1.5694747621766432,
+    "new_device_flag": 0.0,
+    "micro_charge_count": 0.0,
+    "category_change_flag": 1.0,
+    "rule_foreign_transaction": 0.0,
+    "rule_late_night": 0.0
+  },
+  "feature_stds": {
+    "amount": 7416.669477144783,
+    "velocity_count": 1.0027735475849406,
+    "z_score": 89.94233508720686,
+    "travel_speed_kmh": 180111323.95002043,
+    "new_device_flag": 0.4708683699876515,
+    "micro_charge_count": 0.7286731229847669,
+    "category_change_flag": 0.41676970436521177,
+    "rule_foreign_transaction": 0.16988263043393345,
+    "rule_late_night": 0.4572948921430522
+  }
+}

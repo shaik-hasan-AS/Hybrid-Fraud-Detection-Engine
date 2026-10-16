@@ -93,12 +93,14 @@ def main():
     }
 
     print("Saving calibrated model and metadata...")
-    os.makedirs("ml/models", exist_ok=True)
-    joblib.dump(model, "ml/models/isolation_forest.joblib")
-    with open("ml/models/model_meta.json", "w") as f:
+    models_dir = os.path.join(os.path.dirname(__file__), "models")
+    os.makedirs(models_dir, exist_ok=True)
+    joblib.dump(model, os.path.join(models_dir, "isolation_forest.joblib"))
+    with open(os.path.join(models_dir, "model_meta.json"), "w") as f:
         json.dump(meta, f, indent=2)
 
     print("Model and calibration metadata saved successfully.")
+
 
 
 if __name__ == "__main__":
